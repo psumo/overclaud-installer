@@ -74,12 +74,12 @@ func TestDetectManagerAndPlan(t *testing.T) {
 	if m := DetectManager(r, "linux"); m != Apt {
 		t.Fatalf("got %q", m)
 	}
-	git := Tools[0]
+	git := Tools[1]
 	cmd, err := Plan(git, "linux", Apt)
 	if err != nil || cmd[0] != "sudo" || !strings.Contains(strings.Join(cmd, " "), "apt-get install -y git") {
 		t.Fatalf("%v %v", cmd, err)
 	}
-	claude := Tools[3]
+	claude := Tools[4]
 	cmd, _ = Plan(claude, "windows", Winget)
 	if cmd[0] != "powershell" || !strings.Contains(cmd[len(cmd)-1], "claude.ai/install.ps1") {
 		t.Fatalf("claude on windows should use the official installer: %v", cmd)

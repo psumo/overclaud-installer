@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -70,6 +71,9 @@ func Failed(rs []Result) bool {
 func checkTools(o Options) []Result {
 	var out []Result
 	for _, t := range prereq.Tools {
+		if !t.For(runtime.GOOS) {
+			continue
+		}
 		st := prereq.Check(o.Runner, t)
 		switch {
 		case st.OK:

@@ -28,7 +28,21 @@ type Tool struct {
 	Dnf      string
 	Pacman   string
 	Zypper   string
-	Script   Script // official installer, used when no package manager entry fits
+	Script   Script   // official installer, used when no package manager entry fits
+	OS       []string // limit to these GOOS values; empty = all
+}
+
+// For reports whether t applies on goos.
+func (t Tool) For(goos string) bool {
+	if len(t.OS) == 0 {
+		return true
+	}
+	for _, o := range t.OS {
+		if o == goos {
+			return true
+		}
+	}
+	return false
 }
 
 // Script is an official install command per OS ("" = none).
@@ -36,6 +50,9 @@ type Script struct{ Unix, Windows string }
 
 // Tools in install order. Claude Code and uv use their vendors' official installers.
 var Tools = []Tool{
+	// curl fetches the official Claude Code and uv installers on macOS and Linux.
+	{Name: "curl", Bins: []string{"curl"}, Args: []string{"--version"}, Required: true, OS: []string{"linux", "darwin"},
+		Brew: "curl", Apt: "curl ca-certificates", Dnf: "curl ca-certificates", Pacman: "curl ca-certificates", Zypper: "curl ca-certificates"},
 	{Name: "git", Bins: []string{"git"}, Args: []string{"--version"}, Required: true,
 		Winget: "Git.Git", Brew: "git", Apt: "git", Dnf: "git", Pacman: "git", Zypper: "git"},
 	{Name: "Node.js", Bins: []string{"node"}, Args: []string{"--version"}, Min: "18.0.0", Required: true,
