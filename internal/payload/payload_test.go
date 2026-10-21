@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -68,7 +69,7 @@ func TestExtractStripsTopDirAndKeepsExecBit(t *testing.T) {
 		t.Fatal("file not extracted with top dir stripped")
 	}
 	info, _ := os.Stat(filepath.Join(dir, "sync/run.sh"))
-	if info == nil || info.Mode()&0o100 == 0 {
+	if runtime.GOOS != "windows" && (info == nil || info.Mode()&0o100 == 0) {
 		t.Fatal("exec bit lost")
 	}
 }

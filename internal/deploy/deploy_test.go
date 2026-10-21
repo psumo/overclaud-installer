@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"testing"
 
@@ -161,6 +162,9 @@ func TestPython3NormalizationAppliesWhenRequested(t *testing.T) {
 }
 
 func TestWritesKeepRestrictivePermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows uses ACLs, not mode bits; the profile folder is already private")
+	}
 	e := newEnv(t)
 	m1 := e.releaseWith(map[string]string{".claude/settings.json": `{"a":1}`, ".claude/x.md": "1"})
 	st, _ := e.deploy(State{}, m1)
