@@ -221,8 +221,9 @@ func checkHooks(o Options, hooks []hookCmd) []Result {
 		if !strings.HasSuffix(script, ".py") || missingInterp[interp] {
 			continue
 		}
+		// -I: isolated mode, so no module from the working directory can be imported.
 		code := "import ast,sys; ast.parse(open(sys.argv[1], encoding='utf-8').read())"
-		if _, err := o.Runner.Output(interp, "-c", code, script); err != nil {
+		if _, err := o.Runner.Output(interp, "-I", "-c", code, script); err != nil {
 			broken = append(broken, filepath.Base(script))
 		}
 	}
@@ -253,6 +254,7 @@ func checkSafetyHook(o Options, script, interp string, interpMissing bool) Resul
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	c := exec.CommandContext(ctx, interp, script)
+	c.Dir = o.ClaudeDir // a trusted directory, never the caller's working directory
 	c.Stdin = bytes.NewReader(event)
 	err := c.Run()
 	if ee, ok := err.(*exec.ExitError); ok && ee.ExitCode() == 2 {

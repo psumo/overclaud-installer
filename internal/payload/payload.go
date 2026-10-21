@@ -14,6 +14,7 @@ import (
 	neturl "net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -112,11 +113,8 @@ func Extract(r io.Reader, dir string) error {
 		if rel == "" {
 			continue
 		}
-		for _, el := range strings.Split(rel, "/") {
-			if strings.EqualFold(el, ".git") {
-				// The signed manifest does not cover .git, so a release may not carry one.
-				return fmt.Errorf("archive contains a .git entry (%q); refusing it", h.Name)
-			}
+		if err := safeComponents(rel); err != nil {
+			return fmt.Errorf("%v (%q); refusing it", err, h.Name)
 		}
 		switch h.Typeflag {
 		case tar.TypeXGlobalHeader, tar.TypeXHeader:
@@ -159,6 +157,23 @@ func Extract(r io.Reader, dir string) error {
 			return fmt.Errorf("archive contains a link or special file (%q); refusing it", h.Name)
 		}
 	}
+}
+
+var shortName = regexp.MustCompile(`~[0-9]`)
+
+// safeComponents rejects names Windows would treat as something else: a trailing dot or
+// space (".git." is ".git"), 8.3 short names ("GIT~1"), and any .git directory, which the
+// signed manifest does not cover.
+func safeComponents(rel string) error {
+	for _, el := range strings.Split(rel, "/") {
+		if strings.HasSuffix(el, ".") || strings.HasSuffix(el, " ") || shortName.MatchString(el) {
+			return errors.New("archive has a path Windows would rename")
+		}
+		if strings.EqualFold(el, ".git") {
+			return errors.New("archive contains a .git entry")
+		}
+	}
+	return nil
 }
 
 // Verify checks the signature on the release's manifest and every file against it.

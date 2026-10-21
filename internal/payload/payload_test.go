@@ -156,7 +156,7 @@ func TestFetchWritesBodyAndFailsOnHTTPError(t *testing.T) {
 }
 
 func TestExtractRefusesGitDirsAndOversizedArchives(t *testing.T) {
-	for _, name := range []string{"top/.git/config", "top/sub/.GIT/hooks/x"} {
+	for _, name := range []string{"top/.git/config", "top/sub/.GIT/hooks/x", "top/.git./config", "top/.git /config", "top/GIT~1/config"} {
 		if err := Extract(bytes.NewReader(tarball(t, []entry{{name: name, body: "x"}})), t.TempDir()); err == nil {
 			t.Fatalf("%s accepted", name)
 		}

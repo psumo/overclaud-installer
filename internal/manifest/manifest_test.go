@@ -106,3 +106,13 @@ func jsonEscape(s string) string {
 	}
 	return out
 }
+
+func TestVerifyTreeFlagsAGitDirectory(t *testing.T) {
+	root := writeTree(t, map[string]string{".claude/a.md": "a"})
+	m, _ := Build(root, "1")
+	os.MkdirAll(filepath.Join(root, ".git"), 0o755)
+	os.WriteFile(filepath.Join(root, ".git", "config"), []byte("[core]"), 0o644)
+	if len(VerifyTree(root, m)) == 0 {
+		t.Fatal(".git directory not reported")
+	}
+}

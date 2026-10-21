@@ -130,7 +130,7 @@ func VerifySignature(data, sig []byte, pub ed25519.PublicKey) bool {
 }
 
 // VerifyTree compares root against m: every listed file present with the right hash,
-// and no unlisted file (other than the manifest itself and .git).
+// and no unlisted file or .git directory (only the manifest and signature may be extra).
 func VerifyTree(root string, m Manifest) []string {
 	var problems []string
 	listed := map[string]bool{}
@@ -153,7 +153,9 @@ func VerifyTree(root string, m Manifest) []string {
 		rel, _ := filepath.Rel(root, p)
 		rel = filepath.ToSlash(rel)
 		if d.IsDir() {
-			if rel == ".git" {
+			if strings.EqualFold(d.Name(), ".git") {
+				// A release never carries .git: it is outside the signature.
+				problems = append(problems, "unlisted: "+rel)
 				return filepath.SkipDir
 			}
 			return nil
