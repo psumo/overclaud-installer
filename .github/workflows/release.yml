@@ -1,0 +1,70 @@
+name: release
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go test ./...
+      - run: bash scripts/package.sh "${GITHUB_REF_NAME#v}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  macos-pkg:
+    # pkgbuild, productbuild and lipo only exist on macOS.
+    needs: build
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - name: Universal binary and installer package
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          mkdir -p pkgroot/usr/local/bin
+          lipo -create -output pkgroot/usr/local/bin/overclaud "dist/overclaud-$v-darwin-amd64" "dist/overclaud-$v-darwin-arm64"
+          chmod 0755 pkgroot/usr/local/bin/overclaud packaging/macos/scripts/postinstall
+          pkgbuild --root pkgroot --identifier dev.overclaud.installer --version "$v" \
+            --scripts packaging/macos/scripts --install-location / component.pkg
+          productbuild --distribution packaging/macos/distribution.xml --package-path . \
+            --resources packaging/macos/resources "dist/Overclaud-$v.pkg"
+          cp "dist/Overclaud-$v.pkg" dist/Overclaud.pkg
+          cp pkgroot/usr/local/bin/overclaud "dist/overclaud-$v-darwin-universal"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-macos
+          path: |
+            dist/Overclaud*.pkg
+            dist/overclaud-*-darwin-universal
+
+  publish:
+    needs: [build, macos-pkg]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Collect, checksum and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p out
+          cp artifacts/dist/* artifacts/dist-macos/* out/
+          rm -f out/SHA256SUMS
+          (cd out && sha256sum -- * > SHA256SUMS)
+          gh release create "$GITHUB_REF_NAME" out/* --title "Overclaud installer $GITHUB_REF_NAME" \
+            --notes-file packaging/RELEASE_NOTES.md

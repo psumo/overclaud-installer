@@ -213,7 +213,7 @@ func Plan(t Tool, goos string, m Manager) ([]string, error) {
 		case Brew:
 			return append([]string{"brew", "install"}, fields...), nil
 		case Apt:
-			return []string{"sudo", "sh", "-c", "apt-get update -qq && apt-get install -y " + pkg}, nil
+			return []string{"sudo", "sh", "-c", "apt-get update -qq && apt-get install -y --no-install-recommends " + pkg}, nil
 		case Dnf:
 			return append([]string{"sudo", "dnf", "install", "-y"}, fields...), nil
 		case Pacman:

@@ -1,0 +1,11 @@
+#!/bin/sh
+# Runs as root after the package installs /usr/local/bin/overclaud. The harness installs
+# per user, so open Terminal as the logged-in user and start `overclaud install` there.
+user="$(stat -f%Su /dev/console)"
+uid="$(id -u "$user" 2>/dev/null)"
+if [ -n "$uid" ] && [ "$user" != "root" ]; then
+  launchctl asuser "$uid" sudo -u "$user" osascript \
+    -e 'tell application "Terminal" to do script "/usr/local/bin/overclaud install"' \
+    -e 'tell application "Terminal" to activate' >/dev/null 2>&1 || true
+fi
+exit 0

@@ -76,7 +76,7 @@ func TestDetectManagerAndPlan(t *testing.T) {
 	}
 	git := Tools[1]
 	cmd, err := Plan(git, "linux", Apt)
-	if err != nil || cmd[0] != "sudo" || !strings.Contains(strings.Join(cmd, " "), "apt-get install -y git") {
+	if err != nil || cmd[0] != "sudo" || !strings.Contains(strings.Join(cmd, " "), "apt-get install -y --no-install-recommends git") {
 		t.Fatalf("%v %v", cmd, err)
 	}
 	claude := Tools[4]
