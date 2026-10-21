@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,15 +20,25 @@ import (
 	"github.com/psumo/overclaud-installer/internal/manifest"
 )
 
-// MaxDownload caps a release download; the real payload is well under this.
-const MaxDownload = 1 << 30
+// Caps on what a release may contain; the real payload is well under these. Extraction
+// rejects (never truncates) anything larger.
+var (
+	MaxDownload int64 = 1 << 30
+	MaxExtract  int64 = 2 << 30
+	MaxEntries        = 200_000
+)
 
 // Fetch streams url into dst. progress, if set, is called with bytes written so far.
 func Fetch(url, dst string, progress func(int64)) error {
 	c := &http.Client{Timeout: 30 * time.Minute}
 	resp, err := c.Get(url)
 	if err != nil {
-		return fmt.Errorf("download failed: %w", err)
+		// The URL carries a one-time download token: report the cause, never the URL.
+		var ue *neturl.Error
+		if errors.As(err, &ue) {
+			return fmt.Errorf("download failed: %v", ue.Err)
+		}
+		return errors.New("download failed")
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
@@ -76,6 +87,8 @@ func Extract(r io.Reader, dir string) error {
 		return fmt.Errorf("not a gzip archive: %w", err)
 	}
 	tr := tar.NewReader(gz)
+	var total int64
+	entries := 0
 	for {
 		h, err := tr.Next()
 		if errors.Is(err, io.EOF) {
@@ -83,6 +96,9 @@ func Extract(r io.Reader, dir string) error {
 		}
 		if err != nil {
 			return fmt.Errorf("corrupt archive: %w", err)
+		}
+		if entries++; entries > MaxEntries {
+			return errors.New("archive has more entries than any release; refusing it")
 		}
 		name := strings.TrimPrefix(h.Name, "./")
 		i := strings.IndexByte(name, '/')
@@ -95,6 +111,12 @@ func Extract(r io.Reader, dir string) error {
 		rel := strings.TrimSuffix(name[i+1:], "/")
 		if rel == "" {
 			continue
+		}
+		for _, el := range strings.Split(rel, "/") {
+			if strings.EqualFold(el, ".git") {
+				// The signed manifest does not cover .git, so a release may not carry one.
+				return fmt.Errorf("archive contains a .git entry (%q); refusing it", h.Name)
+			}
 		}
 		switch h.Typeflag {
 		case tar.TypeXGlobalHeader, tar.TypeXHeader:
@@ -110,6 +132,10 @@ func Extract(r io.Reader, dir string) error {
 			if err := manifest.SafeRel(rel); err != nil {
 				return err
 			}
+			if h.Size < 0 || total+h.Size > MaxExtract {
+				return errors.New("archive unpacks larger than any release; refusing it")
+			}
+			total += h.Size
 			p := filepath.Join(dir, filepath.FromSlash(rel))
 			if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 				return err
@@ -122,7 +148,7 @@ func Extract(r io.Reader, dir string) error {
 			if err != nil {
 				return err
 			}
-			_, err = io.Copy(f, io.LimitReader(tr, MaxDownload))
+			_, err = io.Copy(f, io.LimitReader(tr, h.Size))
 			if cerr := f.Close(); err == nil {
 				err = cerr
 			}

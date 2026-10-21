@@ -154,3 +154,25 @@ func TestFetchWritesBodyAndFailsOnHTTPError(t *testing.T) {
 		t.Fatal("HTTP 403 not reported")
 	}
 }
+
+func TestExtractRefusesGitDirsAndOversizedArchives(t *testing.T) {
+	for _, name := range []string{"top/.git/config", "top/sub/.GIT/hooks/x"} {
+		if err := Extract(bytes.NewReader(tarball(t, []entry{{name: name, body: "x"}})), t.TempDir()); err == nil {
+			t.Fatalf("%s accepted", name)
+		}
+	}
+	old := MaxExtract
+	MaxExtract = 10
+	defer func() { MaxExtract = old }()
+	big := tarball(t, []entry{{name: "top/a", body: "123456"}, {name: "top/b", body: "123456"}})
+	if err := Extract(bytes.NewReader(big), t.TempDir()); err == nil {
+		t.Fatal("archive over the size cap accepted")
+	}
+}
+
+func TestFetchErrorNeverShowsTheDownloadToken(t *testing.T) {
+	err := Fetch("http://127.0.0.1:1/api/fetch?t=SECRET-TOKEN", filepath.Join(t.TempDir(), "x"), nil)
+	if err == nil || strings.Contains(err.Error(), "SECRET-TOKEN") {
+		t.Fatalf("token leaked or no error: %v", err)
+	}
+}

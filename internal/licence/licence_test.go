@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -95,5 +96,18 @@ func TestLicenceFileRoundTripKeepsInstalledAt(t *testing.T) {
 	second, _ := ReadLicence(p)
 	if second.Version != "s2" || second.InstalledAt != first.InstalledAt || second.InstalledAt == "" {
 		t.Fatalf("first %+v second %+v", first, second)
+	}
+}
+
+func TestLicenceFileIsOwnerOnlyEvenOverAWiderOldFile(t *testing.T) {
+	p := Paths(t.TempDir())
+	os.MkdirAll(filepath.Dir(p.LicenceFile), 0o755)
+	os.WriteFile(p.LicenceFile, []byte("{}"), 0o644)
+	if err := WriteLicence(p, Record{Key: "GC-AB12-CD34-EF56"}); err != nil {
+		t.Fatal(err)
+	}
+	info, _ := os.Stat(p.LicenceFile)
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
+		t.Fatalf("licence file is %v", info.Mode().Perm())
 	}
 }

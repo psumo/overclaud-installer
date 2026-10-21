@@ -166,9 +166,29 @@ func WriteLicence(p Layout, r Record) error {
 	if r.InstalledAt == "" {
 		r.InstalledAt = now
 	}
-	if err := os.MkdirAll(filepath.Dir(p.LicenceFile), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(p.LicenceFile), 0o700); err != nil {
 		return err
 	}
 	data, _ := json.MarshalIndent(r, "", "  ")
-	return os.WriteFile(p.LicenceFile, data, 0o600)
+	// Temp file + chmod + rename: the key is never readable by others, even when an
+	// older file with wider permissions already exists.
+	tmp, err := os.CreateTemp(filepath.Dir(p.LicenceFile), ".license-*")
+	if err != nil {
+		return err
+	}
+	name := tmp.Name()
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		os.Remove(name)
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(name)
+		return err
+	}
+	if err := os.Chmod(name, 0o600); err != nil {
+		os.Remove(name)
+		return err
+	}
+	return os.Rename(name, p.LicenceFile)
 }
