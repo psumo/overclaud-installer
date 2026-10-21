@@ -1,0 +1,4 @@
+dist/
+*.test
+/overclaud
+/overclaud.exe
