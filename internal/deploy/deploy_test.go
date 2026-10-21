@@ -160,6 +160,25 @@ func TestPython3NormalizationAppliesWhenRequested(t *testing.T) {
 	}
 }
 
+func TestWritesKeepRestrictivePermissions(t *testing.T) {
+	e := newEnv(t)
+	m1 := e.releaseWith(map[string]string{".claude/settings.json": `{"a":1}`, ".claude/x.md": "1"})
+	st, _ := e.deploy(State{}, m1)
+	if info, _ := os.Stat(filepath.Join(e.claude, "settings.json")); info.Mode().Perm() != 0o600 {
+		t.Fatalf("new settings.json is %v, want 0600", info.Mode().Perm())
+	}
+	os.Chmod(filepath.Join(e.claude, "x.md"), 0o600)
+	m2 := e.releaseWith(map[string]string{".claude/settings.json": `{"a":2}`, ".claude/x.md": "2"})
+	_, rep := e.deploy(st, m2)
+	if info, _ := os.Stat(filepath.Join(e.claude, "x.md")); info.Mode().Perm() != 0o600 {
+		t.Fatalf("update widened x.md to %v", info.Mode().Perm())
+	}
+	Rollback(rep.Backup, e.claude)
+	if info, _ := os.Stat(filepath.Join(e.claude, "settings.json")); info.Mode().Perm() != 0o600 {
+		t.Fatalf("rollback widened settings.json to %v", info.Mode().Perm())
+	}
+}
+
 func equal(a, b []string) bool {
 	sort.Strings(a)
 	sort.Strings(b)

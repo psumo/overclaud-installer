@@ -177,7 +177,7 @@ func deploySettings(o Options, src string, bk *backup, st *State, rep *Report) e
 	if err != nil {
 		return err
 	}
-	if err := writeAtomic(dst, append(out, '\n'), 0o644); err != nil {
+	if err := writeAtomic(dst, append(out, '\n'), 0o600); err != nil { // may hold API keys in env
 		return err
 	}
 	st.SettingsBase = productRaw
@@ -266,9 +266,15 @@ func copyFile(src, dst string, exec bool) error {
 	return writeAtomic(dst, data, mode)
 }
 
+// writeAtomic replaces dst via a temp file and rename. An existing file keeps its permission
+// bits (plus exec if the product needs it), so a customer's 0600 file never becomes readable
+// by others; mode applies only to new files.
 func writeAtomic(dst string, data []byte, mode fs.FileMode) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
+	}
+	if info, err := os.Stat(dst); err == nil {
+		mode = info.Mode().Perm() | (mode & 0o111)
 	}
 	tmp, err := os.CreateTemp(filepath.Dir(dst), ".overclaud-tmp-*")
 	if err != nil {
