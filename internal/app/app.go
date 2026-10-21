@@ -60,7 +60,9 @@ func New(u *ui.UI) (*App, error) {
 		base = v
 	}
 	return &App{UI: u, Paths: licence.Paths(home), API: licence.Client{Base: base, Version: Version},
-		Runner: prereq.OSRunner{}, PubKey: ed25519.PublicKey(pub)}, nil
+		Runner: prereq.OSRunner{}, PubKey: ed25519.PublicKey(pub),
+		// For packagers and tests: install without registering the daily update job.
+		NoSched: os.Getenv("OVERCLAUD_NO_SCHEDULE") == "1"}, nil
 }
 
 // --- prerequisites ---

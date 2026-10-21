@@ -132,6 +132,9 @@ func TestInstallUpdateRollback(t *testing.T) {
 	home := t.TempDir()
 	claude := filepath.Join(home, ".claude")
 	env := append(os.Environ(), "HOME="+home, "USERPROFILE="+home, "OVERCLAUD_API="+ts.URL+"/api", "NO_COLOR=1")
+	if os.Getenv("CI") == "" {
+		env = append(env, "OVERCLAUD_NO_SCHEDULE=1") // never touch a developer's real scheduler
+	}
 	run := func(args ...string) (string, error) {
 		c := exec.Command(bin, args...)
 		c.Env = env
