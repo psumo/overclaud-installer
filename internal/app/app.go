@@ -205,14 +205,6 @@ type Options struct {
 	AllowDowngrade bool
 }
 
-// normVersion turns "1.4" or "v1.4.0-rc1" into a comparable "1.4.0".
-func normVersion(v string) string {
-	if p, ok := prereq.ParseVersion(v); ok {
-		return p
-	}
-	return "0.0.0"
-}
-
 // Run is install and update in one pipeline.
 func (a *App) Run(o Options) error {
 	total := 6
@@ -243,8 +235,14 @@ func (a *App) Run(o Options) error {
 	if err != nil {
 		return err
 	}
-	if prev.Deploy.Version != "" && !o.AllowDowngrade && !prereq.AtLeast(normVersion(man.Version), normVersion(prev.Deploy.Version)) {
-		return fmt.Errorf("the server offered version %s, older than your installed %s; refusing to downgrade (use --allow-downgrade to force)", man.Version, prev.Deploy.Version)
+	if prev.Deploy.Version != "" && !o.AllowDowngrade {
+		cmp, ok := compareVersions(man.Version, prev.Deploy.Version)
+		switch {
+		case !ok:
+			return fmt.Errorf("cannot compare release version %q with installed %q; refusing it (use --allow-downgrade to force)", man.Version, prev.Deploy.Version)
+		case cmp < 0:
+			return fmt.Errorf("the server offered version %s, older than your installed %s; refusing to downgrade (use --allow-downgrade to force)", man.Version, prev.Deploy.Version)
+		}
 	}
 	a.UI.OK("Version %s, %d files, signature verified", man.Version, len(man.Files))
 
