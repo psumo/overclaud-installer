@@ -91,17 +91,34 @@ type Runner interface {
 	Interactive(name string, args ...string) error
 }
 
+// CleanEnv is the environment for child processes. PSModulePath is dropped: when the
+// installer runs from PowerShell 7, Windows PowerShell 5.1 would otherwise load PowerShell 7's
+// modules and lose built-in cmdlets (seen in CI: Get-FileHash "not recognized" inside
+// Anthropic's install.ps1). Windows PowerShell rebuilds its default path when it is unset.
+func CleanEnv() []string {
+	var out []string
+	for _, kv := range os.Environ() {
+		if !strings.HasPrefix(strings.ToUpper(kv), "PSMODULEPATH=") {
+			out = append(out, kv)
+		}
+	}
+	return out
+}
+
 type OSRunner struct{}
 
 func (OSRunner) LookPath(n string) (string, error) { return exec.LookPath(n) }
 
 func (OSRunner) Output(name string, args ...string) (string, error) {
-	out, err := exec.Command(name, args...).CombinedOutput()
+	c := exec.Command(name, args...)
+	c.Env = CleanEnv()
+	out, err := c.CombinedOutput()
 	return string(out), err
 }
 
 func (OSRunner) Interactive(name string, args ...string) error {
 	c := exec.Command(name, args...)
+	c.Env = CleanEnv()
 	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return c.Run()
 }
@@ -283,8 +300,10 @@ func windowsRegistryPath() string {
 	if runtime.GOOS != "windows" {
 		return ""
 	}
-	out, err := exec.Command("powershell", "-NoProfile", "-Command",
-		"[Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')").Output()
+	c := exec.Command("powershell", "-NoProfile", "-Command",
+		"[Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')")
+	c.Env = CleanEnv()
+	out, err := c.Output()
 	if err != nil {
 		return ""
 	}

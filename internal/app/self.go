@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/psumo/overclaud-installer/internal/prereq"
 )
 
 // installSelf puts this binary where `overclaud` will be found later and returns its path.
@@ -123,7 +125,9 @@ func addWindowsUserPath(dir string) error {
 	script := `& { param($d) $p = [Environment]::GetEnvironmentVariable('Path','User');` +
 		` if (-not $p) { $p = '' }; if (($p -split ';') -notcontains $d) {` +
 		` [Environment]::SetEnvironmentVariable('Path', ($p.TrimEnd(';') + ';' + $d).TrimStart(';'), 'User') } } ` + lit
-	out, err := exec.Command("powershell", "-NoProfile", "-Command", script).CombinedOutput()
+	c := exec.Command("powershell", "-NoProfile", "-Command", script)
+	c.Env = prereq.CleanEnv()
+	out, err := c.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("could not add %s to PATH: %s", dir, strings.TrimSpace(string(out)))
 	}

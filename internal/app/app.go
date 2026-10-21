@@ -348,6 +348,7 @@ func (a *App) runExtras() {
 	} else {
 		cmd = exec.Command("bash", filepath.Join(a.Paths.ProductDir, "sync", "setup-prerequisites.sh"), "--auto")
 	}
+	cmd.Env = prereq.CleanEnv()
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	a.UI.Info("Installing optional extras (browser automation, security scanner, ...). This can take a few minutes.")
 	if err := cmd.Run(); err != nil {

@@ -103,3 +103,12 @@ func TestNodeArchivePicksThisPlatform(t *testing.T) {
 		t.Fatal("windows should use winget, not the tarball")
 	}
 }
+
+func TestCleanEnvDropsPSModulePath(t *testing.T) {
+	t.Setenv("PSModulePath", `C:\Program Files\PowerShell\7\Modules`)
+	t.Setenv("OVERCLAUD_KEEP", "1")
+	env := strings.Join(CleanEnv(), "\n")
+	if strings.Contains(strings.ToUpper(env), "PSMODULEPATH=") || !strings.Contains(env, "OVERCLAUD_KEEP=1") {
+		t.Fatalf("env not cleaned correctly")
+	}
+}
