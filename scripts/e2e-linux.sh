@@ -58,6 +58,11 @@ grep -q "my own note" ~/.claude/rules/common/common-testing.md && pass "customer
 grep -q "9.0.2" ~/.claude/rules/common/common-patterns.md && pass "untouched file updated" || fail "untouched file not updated"
 overclaud status
 
+echo "--- an older signed release is refused"
+switch r1
+if overclaud update; then fail "downgrade to 9.0.1 accepted"; fi
+grep -q "9.0.2" ~/.claude/rules/common/common-patterns.md && pass "downgrade refused, 9.0.2 kept" || fail "downgrade changed files"
+
 echo "--- broken update is rolled back"
 before="$(sha256sum ~/.claude/hooks/scripts/pre-tool-use.py | cut -d' ' -f1)"
 switch r3

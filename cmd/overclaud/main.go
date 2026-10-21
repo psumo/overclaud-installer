@@ -35,6 +35,7 @@ func run(args []string) int {
 	live := fs.Bool("live", false, "doctor: also run a real `claude -p` session")
 	explain := fs.Bool("explain", false, "doctor: ask Claude Code to diagnose failures")
 	noExtras := fs.Bool("no-extras", false, "install: skip optional extras (browser automation, scanners)")
+	downgrade := fs.Bool("allow-downgrade", false, "accept a release older than the installed one")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -56,14 +57,14 @@ func run(args []string) int {
 	switch cmd {
 	case "install":
 		u.Title("Overclaud installer " + app.Version)
-		err = a.Run(app.Options{Key: *key, Interactive: true, Extras: !*noExtras && u.Confirm("Also install optional extras (browser automation, security scanner)?", true)})
+		err = a.Run(app.Options{Key: *key, Interactive: true, AllowDowngrade: *downgrade, Extras: !*noExtras && u.Confirm("Also install optional extras (browser automation, security scanner)?", true)})
 		if err == nil {
 			fmt.Fprintln(u.Out, "\n  Overclaud is installed.")
 			fmt.Fprintln(u.Out, "  Next: open a new terminal, run `claude`, and say: \"Read ~/overclaud/FIRST-RUN.md and get me set up.\"")
 			fmt.Fprintln(u.Out, "  Check it any time with `overclaud doctor`.")
 		}
 	case "update":
-		err = a.Run(app.Options{Interactive: !*quiet, Repair: *repair, Update: true})
+		err = a.Run(app.Options{Interactive: !*quiet, Repair: *repair, Update: true, AllowDowngrade: *downgrade})
 	case "doctor":
 		err = a.Doctor(*live, *explain)
 	case "status":

@@ -52,7 +52,12 @@ func New(u *ui.UI) (*App, error) {
 	}
 	base := licence.DefaultBase
 	if v := os.Getenv("OVERCLAUD_API"); v != "" {
-		base = v // safe to override: downloads are still checked against the embedded key
+		// For tests and staging. Downloads are still checked against the embedded key, and
+		// plain HTTP is only allowed to this machine.
+		if !strings.HasPrefix(v, "https://") && !strings.HasPrefix(v, "http://127.0.0.1:") && !strings.HasPrefix(v, "http://localhost:") {
+			return nil, errors.New("OVERCLAUD_API must be an https:// URL")
+		}
+		base = v
 	}
 	return &App{UI: u, Paths: licence.Paths(home), API: licence.Client{Base: base, Version: Version},
 		Runner: prereq.OSRunner{}, PubKey: ed25519.PublicKey(pub)}, nil
@@ -195,6 +200,17 @@ type Options struct {
 	Live        bool // doctor runs a real claude -p session
 	Extras      bool // run the release's optional extras installer
 	Update      bool
+	// AllowDowngrade accepts a signed release older than the installed one. Without it an
+	// old (validly signed) release cannot be used to roll a customer back.
+	AllowDowngrade bool
+}
+
+// normVersion turns "1.4" or "v1.4.0-rc1" into a comparable "1.4.0".
+func normVersion(v string) string {
+	if p, ok := prereq.ParseVersion(v); ok {
+		return p
+	}
+	return "0.0.0"
 }
 
 // Run is install and update in one pipeline.
@@ -226,6 +242,9 @@ func (a *App) Run(o Options) error {
 	dir, man, err := a.stage(dl)
 	if err != nil {
 		return err
+	}
+	if prev.Deploy.Version != "" && !o.AllowDowngrade && !prereq.AtLeast(normVersion(man.Version), normVersion(prev.Deploy.Version)) {
+		return fmt.Errorf("the server offered version %s, older than your installed %s; refusing to downgrade (use --allow-downgrade to force)", man.Version, prev.Deploy.Version)
 	}
 	a.UI.OK("Version %s, %d files, signature verified", man.Version, len(man.Files))
 
