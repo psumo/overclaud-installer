@@ -3,7 +3,7 @@
 //	overclaud                    interactive install (what a double-click runs)
 //	overclaud install [--key K]  install or reinstall
 //	overclaud update [--quiet] [--repair]
-//	overclaud doctor [--live] [--explain]
+//	overclaud doctor [--live] [--explain] [--device]
 //	overclaud status
 //	overclaud keys [list|set S|test [S]|remove S]   sign-ins and API keys
 //	overclaud with-keys S[,S] -- cmd [args]         run cmd with those keys (MCP servers)
@@ -53,6 +53,7 @@ func run(args []string) int {
 	repair := fs.Bool("repair", false, "reinstall the current release even if up to date")
 	live := fs.Bool("live", false, "doctor: also run a real `claude -p` session")
 	explain := fs.Bool("explain", false, "doctor: ask Claude Code to diagnose failures")
+	device := fs.Bool("device", false, "doctor: check Overclaud works on this computer (real session, hooks, MCP, memory) and offer fixes")
 	noExtras := fs.Bool("no-extras", false, "install: skip the optional extras (browser testing, security scanning, media tools)")
 	downgrade := fs.Bool("allow-downgrade", false, "accept a release older than the installed one")
 	if err := fs.Parse(args); err != nil {
@@ -85,7 +86,7 @@ func run(args []string) int {
 	case "update":
 		err = a.Run(app.Options{Interactive: !*quiet, Repair: *repair, Update: true, AllowDowngrade: *downgrade})
 	case "doctor":
-		err = a.Doctor(*live, *explain)
+		err = a.Doctor(*live, *explain, *device)
 	case "status":
 		err = a.Status()
 	default:

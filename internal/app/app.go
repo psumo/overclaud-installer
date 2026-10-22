@@ -213,7 +213,7 @@ type Options struct {
 
 // Run is install and update in one pipeline.
 func (a *App) Run(o Options) error {
-	total := 8
+	total := 9
 	a.UI.Step(1, total, "Checking prerequisites")
 	if err := a.prerequisites(o.Interactive); err != nil {
 		return err
@@ -308,7 +308,12 @@ func (a *App) Run(o Options) error {
 		return err
 	}
 
-	a.UI.Step(8, total, "Finishing")
+	if !doctor.Failed(results) {
+		a.UI.Step(8, total, "Checking it works on this computer")
+		a.DeviceCheck(o.Interactive, bin)
+	}
+
+	a.UI.Step(9, total, "Finishing")
 	if !a.NoSelf && !a.NoSched && bin != "" {
 		if how, err := schedule.Install(bin, a.Paths.Home, licence.DeviceID(a.Paths)); err != nil {
 			a.UI.Warn("Automatic updates not scheduled: %v", err)
@@ -408,7 +413,12 @@ func (a *App) printResults(rs []doctor.Result) {
 }
 
 // Doctor runs the checks on the current install.
-func (a *App) Doctor(live, explain bool) error {
+func (a *App) Doctor(live, explain, device bool) error {
+	if device {
+		bin, _ := os.Executable()
+		a.DeviceCheck(true, bin)
+		return nil
+	}
 	prereq.ExtendPath(a.Paths.Home)
 	st := loadState(a.Paths.OverclaudHome)
 	o := doctor.Options{Home: a.Paths.Home, ClaudeDir: a.Paths.ClaudeDir, State: st.Deploy, Runner: a.Runner, Live: live}

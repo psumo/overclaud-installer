@@ -131,7 +131,10 @@ func TestInstallUpdateRollback(t *testing.T) {
 	defer ts.Close()
 	home := t.TempDir()
 	claude := filepath.Join(home, ".claude")
-	env := append(os.Environ(), "HOME="+home, "USERPROFILE="+home, "OVERCLAUD_API="+ts.URL+"/api", "NO_COLOR=1")
+	// The device check starts a real Claude Code session; it has its own tests, and this
+	// one must stay offline and deterministic.
+	env := append(os.Environ(), "HOME="+home, "USERPROFILE="+home, "OVERCLAUD_API="+ts.URL+"/api", "NO_COLOR=1",
+		"OVERCLAUD_NO_DEVICE_CHECK=1", "OVERCLAUD_SECRETS=file")
 	if os.Getenv("CI") == "" {
 		env = append(env, "OVERCLAUD_NO_SCHEDULE=1") // never touch a developer's real scheduler
 	}
