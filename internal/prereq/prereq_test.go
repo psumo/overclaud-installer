@@ -74,12 +74,12 @@ func TestDetectManagerAndPlan(t *testing.T) {
 	if m := DetectManager(r, "linux"); m != Apt {
 		t.Fatalf("got %q", m)
 	}
-	git := Tools[1]
+	git := toolNamed(t, "git")
 	cmd, err := Plan(git, "linux", Apt)
 	if err != nil || cmd[0] != "sudo" || !strings.Contains(strings.Join(cmd, " "), "apt-get install -y --no-install-recommends git") {
 		t.Fatalf("%v %v", cmd, err)
 	}
-	claude := Tools[4]
+	claude := toolNamed(t, "Claude Code")
 	cmd, _ = Plan(claude, "windows", Winget)
 	if cmd[0] != "powershell" || !strings.Contains(cmd[len(cmd)-1], "claude.ai/install.ps1") {
 		t.Fatalf("claude on windows should use the official installer: %v", cmd)
@@ -111,4 +111,15 @@ func TestCleanEnvDropsPSModulePath(t *testing.T) {
 	if strings.Contains(strings.ToUpper(env), "PSMODULEPATH=") || !strings.Contains(env, "OVERCLAUD_KEEP=1") {
 		t.Fatalf("env not cleaned correctly")
 	}
+}
+
+func toolNamed(t *testing.T, name string) Tool {
+	t.Helper()
+	for _, tl := range Tools {
+		if tl.Name == name {
+			return tl
+		}
+	}
+	t.Fatalf("no tool %q", name)
+	return Tool{}
 }

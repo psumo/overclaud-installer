@@ -57,6 +57,9 @@ var Tools = []Tool{
 	// curl fetches the official Claude Code and uv installers on macOS and Linux.
 	{Name: "curl", Bins: []string{"curl"}, Args: []string{"--version"}, Required: true, OS: []string{"linux", "darwin"},
 		Brew: "curl", Apt: "curl ca-certificates", Dnf: "curl ca-certificates", Pacman: "curl ca-certificates", Zypper: "curl ca-certificates"},
+	// unzip: bun's official installer unpacks a zip (minimal Linux images lack it).
+	{Name: "unzip", Bins: []string{"unzip"}, Args: []string{"-v"}, Required: true, OS: []string{"linux"},
+		Apt: "unzip", Dnf: "unzip", Pacman: "unzip", Zypper: "unzip"},
 	{Name: "git", Bins: []string{"git"}, Args: []string{"--version"}, Required: true,
 		Winget: "Git.Git", Brew: "git", Apt: "git", Dnf: "git", Pacman: "git", Zypper: "git"},
 	{Name: "Node.js", Bins: []string{"node"}, Args: []string{"--version"}, Min: "18.0.0", Required: true,
