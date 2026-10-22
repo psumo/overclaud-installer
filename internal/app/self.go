@@ -14,6 +14,19 @@ import (
 
 // installSelf puts this binary where `overclaud` will be found later and returns its path.
 // Package-manager installs (/usr/bin, /usr/local/bin, /opt) are left where they are.
+// selfPath is where `overclaud` lives once installed: the copy installSelf makes, or in
+// tests (NoSelf) the running binary.
+func (a *App) selfPath() (string, error) {
+	if a.NoSelf {
+		exe, err := os.Executable()
+		if err != nil {
+			return "", err
+		}
+		return filepath.EvalSymlinks(exe)
+	}
+	return a.installSelf()
+}
+
 func (a *App) installSelf() (string, error) {
 	exe, err := os.Executable()
 	if err != nil {

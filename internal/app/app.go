@@ -214,7 +214,7 @@ type Options struct {
 
 // Run is install and update in one pipeline.
 func (a *App) Run(o Options) error {
-	total := 7
+	total := 8
 	a.UI.Step(1, total, "Checking prerequisites")
 	if err := a.prerequisites(o.Interactive); err != nil {
 		return err
@@ -276,12 +276,20 @@ func (a *App) Run(o Options) error {
 		return fmt.Errorf("install failed and was undone: %w", err)
 	}
 
+	bin, err := a.selfPath()
+	if err != nil {
+		a.UI.Warn("Could not put `overclaud` on your PATH: %v", err)
+	}
+
+	a.UI.Step(5, total, "Setting up MCP servers and plugins")
+	a.SetupClaude(a.Paths.ProductDir, bin)
+
 	if !o.Update {
-		a.UI.Step(5, total, "Connecting your services")
+		a.UI.Step(6, total, "Connecting your services")
 		a.ConnectServices(o.Interactive)
 	}
 
-	a.UI.Step(6, total, "Checking the install")
+	a.UI.Step(7, total, "Checking the install")
 	results := doctor.Run(doctor.Options{Home: a.Paths.Home, ClaudeDir: a.Paths.ClaudeDir, State: st, Runner: a.Runner, Live: o.Live})
 	results = append(results, a.serviceResults(false)...)
 	a.printResults(results)
@@ -301,16 +309,12 @@ func (a *App) Run(o Options) error {
 		return err
 	}
 
-	a.UI.Step(7, total, "Finishing")
-	if !a.NoSelf {
-		if bin, err := a.installSelf(); err != nil {
-			a.UI.Warn("Could not put `overclaud` on your PATH: %v", err)
-		} else if !a.NoSched {
-			if how, err := schedule.Install(bin, a.Paths.Home, licence.DeviceID(a.Paths)); err != nil {
-				a.UI.Warn("Automatic updates not scheduled: %v", err)
-			} else {
-				a.UI.OK("Automatic updates: %s", how)
-			}
+	a.UI.Step(8, total, "Finishing")
+	if !a.NoSelf && !a.NoSched && bin != "" {
+		if how, err := schedule.Install(bin, a.Paths.Home, licence.DeviceID(a.Paths)); err != nil {
+			a.UI.Warn("Automatic updates not scheduled: %v", err)
+		} else {
+			a.UI.OK("Automatic updates: %s", how)
 		}
 	}
 	if o.Extras {

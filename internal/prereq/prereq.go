@@ -62,6 +62,20 @@ var Tools = []Tool{
 	{Name: "Claude Code", Bins: []string{"claude"}, Args: []string{"--version"}, Required: true,
 		Script: Script{Unix: "curl -fsSL https://claude.ai/install.sh | bash",
 			Windows: "irm https://claude.ai/install.ps1 | iex"}},
+	// bun runs claude-mem's memory worker; claude-mem does not install it and fails without it.
+	{Name: "bun", Bins: []string{"bun"}, Args: []string{"--version"}, Required: true,
+		Winget: "Oven-sh.Bun", Brew: "oven-sh/bun/bun",
+		Script: Script{Unix: "curl -fsSL https://bun.sh/install | bash",
+			Windows: "irm bun.sh/install.ps1 | iex"}},
+	// The GitHub CLI signs in to GitHub and supplies the GitHub MCP server's token.
+	{Name: "GitHub CLI", Bins: []string{"gh"}, Args: []string{"--version"},
+		Winget: "GitHub.cli", Brew: "gh", Apt: "gh", Dnf: "gh", Pacman: "github-cli", Zypper: "gh"},
+	// PyYAML is read by the nightly self-improvement loop. Package managers first: newer
+	// Debian/Ubuntu refuse `pip install` outside a virtual environment (PEP 668).
+	{Name: "PyYAML", Bins: pythonBins(), Args: []string{"-c", "import yaml; print(yaml.__version__)"},
+		Brew: "pyyaml", Apt: "python3-yaml", Dnf: "python3-pyyaml", Pacman: "python-yaml", Zypper: "python3-PyYAML",
+		Script: Script{Unix: "python3 -m pip install --user pyyaml",
+			Windows: "py -m pip install --user pyyaml"}},
 	{Name: "uv", Bins: []string{"uv"}, Args: []string{"--version"},
 		Winget: "astral-sh.uv", Brew: "uv",
 		Script: Script{Unix: "curl -LsSf https://astral.sh/uv/install.sh | sh",
@@ -264,7 +278,7 @@ func manualHint(t Tool, goos string) string {
 // ExtendPath adds the directories installers commonly use, so a tool installed a moment
 // ago is found without opening a new terminal.
 func ExtendPath(home string) {
-	dirs := []string{filepath.Join(home, ".local", "bin"), filepath.Join(home, ".cargo", "bin")}
+	dirs := []string{filepath.Join(home, ".local", "bin"), filepath.Join(home, ".cargo", "bin"), filepath.Join(home, ".bun", "bin")}
 	switch runtime.GOOS {
 	case "darwin":
 		dirs = append(dirs, "/opt/homebrew/bin", "/usr/local/bin")

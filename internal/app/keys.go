@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -186,6 +187,12 @@ func (a *App) Keys(args []string) error {
 		a.UI.OK("%s key removed", s.Name)
 	case "session-env":
 		return a.sessionEnv()
+	case "header":
+		s, err := one()
+		if err != nil {
+			return err
+		}
+		return a.header(s)
 	default:
 		return fmt.Errorf("unknown `keys` command %q (list, set, test, remove)", sub)
 	}
@@ -349,4 +356,33 @@ func (a *App) serviceResults(verify bool) []doctor.Result {
 		out = append(out, a.serviceResult(s, verify))
 	}
 	return out
+}
+
+// header prints the request header for an MCP server's headersHelper, e.g.
+// {"Authorization":"Bearer ..."} for GitHub's hosted server. Claude Code runs it per
+// connection, so the token is never written into a config file.
+func (a *App) header(s services.Service) error {
+	val := ""
+	if len(s.TokenCmd) > 0 {
+		if out, err := exec.Command(s.TokenCmd[0], s.TokenCmd[1:]...).Output(); err == nil {
+			val = strings.TrimSpace(string(out))
+		}
+	}
+	if val == "" {
+		v, err := a.store().Get(s.ID)
+		if err != nil || v == "" {
+			return fmt.Errorf("no %s credential; connect it with `overclaud keys set %s`", s.Name, s.ID)
+		}
+		val = v
+	}
+	name, prefix := "Authorization", "Bearer "
+	if s.Verify != nil {
+		name, prefix = s.Verify.Header, s.Verify.Prefix
+	}
+	b, err := json.Marshal(map[string]string{name: prefix + val})
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintln(os.Stdout, string(b))
+	return err
 }

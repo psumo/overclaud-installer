@@ -40,7 +40,7 @@ func testApp(t *testing.T, input string) (*App, *bytes.Buffer) {
 	home := t.TempDir()
 	out := &bytes.Buffer{}
 	u := &ui.UI{Out: out, In: bufio.NewReader(strings.NewReader(input))}
-	return &App{UI: u, Paths: licence.Layout{Home: home}, Runner: stubRunner{signedIn: true},
+	return &App{UI: u, Paths: licence.Layout{Home: home, ClaudeDir: filepath.Join(home, ".claude")}, Runner: stubRunner{signedIn: true},
 		secrets: secrets.FileStore{Dir: filepath.Join(home, ".overclaud", "secrets")}}, out
 }
 
