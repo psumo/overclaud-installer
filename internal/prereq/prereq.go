@@ -30,6 +30,9 @@ type Tool struct {
 	Zypper   string
 	Script   Script   // official installer, used when no package manager entry fits
 	OS       []string // limit to these GOOS values; empty = all
+	// Present replaces the PATH check for things that are not a command (a downloaded
+	// browser); it returns the version found.
+	Present func() (string, bool)
 }
 
 // For reports whether t applies on goos.
@@ -177,6 +180,14 @@ func part(p []string, i int) int {
 // Check finds a tool and its version.
 func Check(r Runner, t Tool) Status {
 	st := Status{Tool: t}
+	if t.Present != nil {
+		if v, ok := t.Present(); ok {
+			st.Version, st.OK = v, true
+			return st
+		}
+		st.Problem = "not found"
+		return st
+	}
 	for _, b := range t.Bins {
 		p, err := r.LookPath(b)
 		if err != nil {

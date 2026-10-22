@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/psumo/overclaud-installer/internal/app"
+	"github.com/psumo/overclaud-installer/internal/prereq"
 	"github.com/psumo/overclaud-installer/internal/ui"
 )
 
@@ -52,7 +53,7 @@ func run(args []string) int {
 	repair := fs.Bool("repair", false, "reinstall the current release even if up to date")
 	live := fs.Bool("live", false, "doctor: also run a real `claude -p` session")
 	explain := fs.Bool("explain", false, "doctor: ask Claude Code to diagnose failures")
-	noExtras := fs.Bool("no-extras", false, "install: skip optional extras (browser automation, scanners)")
+	noExtras := fs.Bool("no-extras", false, "install: skip the optional extras (browser testing, security scanning, media tools)")
 	downgrade := fs.Bool("allow-downgrade", false, "accept a release older than the installed one")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -75,7 +76,7 @@ func run(args []string) int {
 	switch cmd {
 	case "install":
 		u.Title("Overclaud installer " + app.Version)
-		err = a.Run(app.Options{Key: *key, Interactive: true, AllowDowngrade: *downgrade, Extras: !*noExtras && u.Confirm("Also install optional extras (browser automation, security scanner)?", true)})
+		err = a.Run(app.Options{Key: *key, Interactive: true, AllowDowngrade: *downgrade, Extras: chooseExtras(u, *noExtras)})
 		if err == nil {
 			fmt.Fprintln(u.Out, "\n  Overclaud is installed.")
 			fmt.Fprintln(u.Out, "  Next: open a new terminal, run `claude`, and say: \"Read ~/overclaud/FIRST-RUN.md and get me set up.\"")
@@ -111,4 +112,19 @@ func withKeys(args []string) int {
 		return 1
 	}
 	return a.WithKeys(strings.Split(args[0], ","), args[2:])
+}
+
+// chooseExtras asks about each optional group, with why it is useful and its size.
+func chooseExtras(u *ui.UI, none bool) []string {
+	if none {
+		return nil
+	}
+	u.Info("Optional extras (Overclaud works without them; add them later with `overclaud install --repair`):")
+	var ids []string
+	for _, g := range prereq.Extras {
+		if u.Confirm(fmt.Sprintf("%s: %s (%s). Install?", g.Name, g.Why, g.Size), true) {
+			ids = append(ids, g.ID)
+		}
+	}
+	return ids
 }

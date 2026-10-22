@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -203,9 +202,9 @@ func (a *App) stage(dl licence.Download) (string, manifest.Manifest, error) {
 type Options struct {
 	Key         string
 	Interactive bool
-	Repair      bool // redeploy even when already up to date
-	Live        bool // doctor runs a real claude -p session
-	Extras      bool // run the release's optional extras installer
+	Repair      bool     // redeploy even when already up to date
+	Live        bool     // doctor runs a real claude -p session
+	Extras      []string // optional groups to install (prereq.Extras ids)
 	Update      bool
 	// AllowDowngrade accepts a signed release older than the installed one. Without it an
 	// old (validly signed) release cannot be used to roll a customer back.
@@ -317,8 +316,8 @@ func (a *App) Run(o Options) error {
 			a.UI.OK("Automatic updates: %s", how)
 		}
 	}
-	if o.Extras {
-		a.runExtras()
+	if len(o.Extras) > 0 {
+		a.runExtras(o.Extras)
 	}
 	if doctor.Failed(results) {
 		a.UI.Warn("Some checks failed (above). Run `overclaud doctor --explain` for a diagnosis.")
@@ -355,19 +354,33 @@ func (a *App) restoreProductDir(prev string) {
 	_ = os.Rename(prev, a.Paths.ProductDir)
 }
 
-func (a *App) runExtras() {
-	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		cmd = exec.Command("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
-			filepath.Join(a.Paths.ProductDir, "sync", "setup-prerequisites.ps1"), "-Auto")
-	} else {
-		cmd = exec.Command("bash", filepath.Join(a.Paths.ProductDir, "sync", "setup-prerequisites.sh"), "--auto")
-	}
-	cmd.Env = prereq.CleanEnv()
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-	a.UI.Info("Installing optional extras (browser automation, security scanner, ...). This can take a few minutes.")
-	if err := cmd.Run(); err != nil {
-		a.UI.Warn("Some optional extras did not install (%v). Overclaud works without them.", err)
+// runExtras installs the optional groups the customer chose; failures only warn.
+func (a *App) runExtras(ids []string) {
+	mgr := prereq.DetectManager(a.Runner, runtime.GOOS)
+	for _, id := range ids {
+		g, ok := prereq.ExtraByID(id)
+		if !ok {
+			continue
+		}
+		for _, tl := range g.Tools {
+			if !tl.For(runtime.GOOS) {
+				continue
+			}
+			if st := prereq.Check(a.Runner, tl); st.OK {
+				a.UI.OK("%s %s", tl.Name, st.Version)
+				continue
+			}
+			if err := a.installTool(tl, mgr); err != nil {
+				a.UI.Warn("%s (%s) not installed: %v", tl.Name, g.Name, err)
+				continue
+			}
+			prereq.ExtendPath(a.Paths.Home)
+			if st := prereq.Check(a.Runner, tl); st.OK {
+				a.UI.OK("%s %s installed", tl.Name, st.Version)
+			} else {
+				a.UI.Warn("%s (%s) still missing after install", tl.Name, g.Name)
+			}
+		}
 	}
 }
 
