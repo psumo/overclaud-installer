@@ -81,3 +81,18 @@ window with every step: https://claude.ai/artifact/By6ZEx2JqHEaxiKRswoadm (priva
 | F9 | Connect services: sign-ins (Claude, GitHub, Stripe, Semgrep) and API keys (Exa, Gemini recommended; Firecrawl, OpenAI, OpenRouter, Artificial Analysis, Context7, KIE AI optional), each with why it is needed and where to get it. Keys go into the OS key store (Windows Credential Manager, macOS Keychain, Linux Secret Service; 0600 file fallback on headless Linux), are tested with a harmless request when entered, and reach their consumers without settings files: MCP servers through `overclaud with-keys <service> -- <cmd>`, skill keys through a SessionStart hook writing to `CLAUDE_ENV_FILE`. `overclaud keys` lists, sets, tests and removes them. Hook and deny rules guard the store. | Each key round-trips through the store; a wrong key is caught on entry; doctor reports each service. |
 | F2 | Full install with the real payload, extras included, on Windows, macOS and Linux. | CI green on all three. |
 | F3 | Docs: install, update, keys, troubleshooting, site FAQ, llms.txt, changelog. | Docs match the shipped behaviour. |
+
+### v1.4.1 shipped 2026-10-22
+F1, F5, F6, F8, F9, F2 (Linux container on the real signed payload, CI on all three) and F3 done.
+F7 partial: macOS/Windows learn and propose, candidates queue untested (testing needs Linux).
+OpenRouter and Artificial Analysis keys left out: `claude --or` is studio-only (Linux/systemd).
+
+## v1.4.2 (next): Concord session coordination
+Concord (MIT, `@concord-ai/concord-mcp`) went into the live harness on studio 2026-10-22 as a
+warn-only pilot: sessions claim files, are warned before editing another session's claim, and
+message each other. To ship: installer installs the package pinned and registers its MCP server;
+Node minimum rises to 22.12; the hook resolves the package from `npm root -g` instead of studio's
+path; product settings get its four hooks; device check covers it; test better-sqlite3 on all
+three platforms. Until then the next payload build must exclude skills/concord,
+rules/common/common-coordination.md and hooks/scripts/concord-hook.mjs, and the Concord lines
+in foreman, dev/build, orchestrate and multi/*.
