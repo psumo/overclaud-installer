@@ -65,3 +65,19 @@ harness itself stays licence-gated behind overclaud.dev).
 Unit tests for manifest, deploy, settings merge, prerequisite parsing. Integration test runs a
 full install against a local fake licence server in a clean container. GitHub Actions runs the
 same on windows-latest, macos-latest and ubuntu-latest.
+
+## v1.4.1 (planned 2026-10-22)
+
+Command-line installer only; the graphical window (v1.5.0) reuses all of it. Mockup of the
+window with every step: https://claude.ai/artifact/By6ZEx2JqHEaxiKRswoadm (private).
+
+| # | Item | Done when |
+|---|---|---|
+| F1 | Setup steps install.sh had and the native installer skipped: device overrides, MCP server config (GitHub through `with-keys`, claude-flow; no GitNexus), claude-mem plugin + bun deps. Fix skills/commands that expect MCP servers we do not ship (`ace-tool`, `reasoning`): ship them if licensed, else drop the references. | Fresh install has every MCP server and claude-mem working; doctor checks each. |
+| F5 | Device check: a real `claude -p` session proves each hook fires and the safety hook blocks inside a session; deterministic report of settings location, hook shell, interpreter, MCP servers, scheduler; Claude explains failures and picks repairs from a fixed tested list (never its own commands); max 3 rounds; runs after every update. | Check passes on a clean machine; a seeded misconfiguration is found and repaired. |
+| F6 | Required tools for self-improvement (claude-mem, bun, uv, PyYAML, jq, gh, sandbox) always installed; genuinely optional tools (Playwright, Semgrep, media) asked per group with size. | Unticking extras never breaks memory or the nightly loop. |
+| F7 | Nightly loop sandbox on macOS via Claude Code's sandbox; Windows through WSL, stated plainly. | Loop probes run on macOS CI. |
+| F8 | Serena enabled per typed project, not globally; no a2a gateway or GitNexus in the shipped config. | Shipped settings have none of them on by default. |
+| F9 | Connect services: sign-ins (Claude, GitHub, Stripe, Semgrep) and API keys (Exa, Gemini recommended; Firecrawl, OpenAI, OpenRouter, Artificial Analysis, Context7, KIE AI optional), each with why it is needed and where to get it. Keys go into the OS key store (Windows Credential Manager, macOS Keychain, Linux Secret Service; 0600 file fallback on headless Linux), are tested with a harmless request when entered, and reach their consumers without settings files: MCP servers through `overclaud with-keys <service> -- <cmd>`, skill keys through a SessionStart hook writing to `CLAUDE_ENV_FILE`. `overclaud keys` lists, sets, tests and removes them. Hook and deny rules guard the store. | Each key round-trips through the store; a wrong key is caught on entry; doctor reports each service. |
+| F2 | Full install with the real payload, extras included, on Windows, macOS and Linux. | CI green on all three. |
+| F3 | Docs: install, update, keys, troubleshooting, site FAQ, llms.txt, changelog. | Docs match the shipped behaviour. |
