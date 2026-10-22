@@ -20,6 +20,8 @@ import (
 	"github.com/psumo/overclaud-installer/internal/payload"
 	"github.com/psumo/overclaud-installer/internal/prereq"
 	"github.com/psumo/overclaud-installer/internal/schedule"
+	"github.com/psumo/overclaud-installer/internal/secrets"
+	"github.com/psumo/overclaud-installer/internal/services"
 	"github.com/psumo/overclaud-installer/internal/ui"
 )
 
@@ -36,8 +38,11 @@ type App struct {
 	API     licence.Client
 	Runner  prereq.Runner
 	PubKey  ed25519.PublicKey
-	NoSched bool // tests and packagers: do not register the daily job
-	NoSelf  bool // tests: do not copy the binary into place
+	NoSched bool          // tests and packagers: do not register the daily job
+	NoSelf  bool          // tests: do not copy the binary into place
+	HTTP    services.Doer // key checks; nil means a default client
+
+	secrets secrets.Store // opened on first use
 }
 
 // New builds the App for the current user.
@@ -209,7 +214,7 @@ type Options struct {
 
 // Run is install and update in one pipeline.
 func (a *App) Run(o Options) error {
-	total := 6
+	total := 7
 	a.UI.Step(1, total, "Checking prerequisites")
 	if err := a.prerequisites(o.Interactive); err != nil {
 		return err
@@ -271,8 +276,14 @@ func (a *App) Run(o Options) error {
 		return fmt.Errorf("install failed and was undone: %w", err)
 	}
 
-	a.UI.Step(5, total, "Checking the install")
+	if !o.Update {
+		a.UI.Step(5, total, "Connecting your services")
+		a.ConnectServices(o.Interactive)
+	}
+
+	a.UI.Step(6, total, "Checking the install")
 	results := doctor.Run(doctor.Options{Home: a.Paths.Home, ClaudeDir: a.Paths.ClaudeDir, State: st, Runner: a.Runner, Live: o.Live})
+	results = append(results, a.serviceResults(false)...)
 	a.printResults(results)
 	if doctor.Failed(results) && o.Update {
 		a.UI.Fail("The update failed its checks; restoring the previous version")
@@ -290,7 +301,7 @@ func (a *App) Run(o Options) error {
 		return err
 	}
 
-	a.UI.Step(6, total, "Finishing")
+	a.UI.Step(7, total, "Finishing")
 	if !a.NoSelf {
 		if bin, err := a.installSelf(); err != nil {
 			a.UI.Warn("Could not put `overclaud` on your PATH: %v", err)
@@ -385,6 +396,7 @@ func (a *App) Doctor(live, explain bool) error {
 	st := loadState(a.Paths.OverclaudHome)
 	o := doctor.Options{Home: a.Paths.Home, ClaudeDir: a.Paths.ClaudeDir, State: st.Deploy, Runner: a.Runner, Live: live}
 	rs := doctor.Run(o)
+	rs = append(rs, a.serviceResults(true)...)
 	a.printResults(rs)
 	if !doctor.Failed(rs) {
 		a.UI.OK("Everything checks out.")

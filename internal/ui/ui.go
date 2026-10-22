@@ -9,6 +9,8 @@ import (
 	"os"
 	"runtime"
 	"strings"
+
+	"golang.org/x/term"
 )
 
 type UI struct {
@@ -16,6 +18,7 @@ type UI struct {
 	In    *bufio.Reader
 	Quiet bool
 	color bool
+	rawIn io.Reader // the reader under In, so AskSecret can turn echo off on a terminal
 }
 
 func New(quiet bool) *UI {
@@ -23,7 +26,7 @@ func New(quiet bool) *UI {
 	if runtime.GOOS == "windows" && os.Getenv("WT_SESSION") == "" {
 		color = false // classic conhost may not render ANSI
 	}
-	return &UI{Out: os.Stdout, In: bufio.NewReader(os.Stdin), Quiet: quiet, color: color}
+	return &UI{Out: os.Stdout, In: bufio.NewReader(os.Stdin), Quiet: quiet, color: color, rawIn: os.Stdin}
 }
 
 func isTerminal(f *os.File) bool {
@@ -74,6 +77,26 @@ func (u *UI) Fail(format string, a ...any) {
 // Ask prompts and returns the trimmed answer ("" on EOF).
 func (u *UI) Ask(prompt string) string {
 	fmt.Fprint(u.Out, "  "+prompt)
+	line, _ := u.In.ReadString('\n')
+	return strings.TrimSpace(line)
+}
+
+// HasTerminal reports whether a person can answer prompts and finish a browser sign-in.
+func (u *UI) HasTerminal() bool {
+	f, ok := u.rawIn.(*os.File)
+	return ok && term.IsTerminal(int(f.Fd()))
+}
+
+// AskSecret reads a line without echoing it when the input is a terminal (API keys).
+func (u *UI) AskSecret(prompt string) string {
+	fmt.Fprint(u.Out, "  "+prompt)
+	if f, ok := u.rawIn.(*os.File); ok && term.IsTerminal(int(f.Fd())) {
+		b, err := term.ReadPassword(int(f.Fd()))
+		fmt.Fprintln(u.Out)
+		if err == nil {
+			return strings.TrimSpace(string(b))
+		}
+	}
 	line, _ := u.In.ReadString('\n')
 	return strings.TrimSpace(line)
 }

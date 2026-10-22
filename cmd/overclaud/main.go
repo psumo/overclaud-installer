@@ -5,6 +5,8 @@
 //	overclaud update [--quiet] [--repair]
 //	overclaud doctor [--live] [--explain]
 //	overclaud status
+//	overclaud keys [list|set S|test [S]|remove S]   sign-ins and API keys
+//	overclaud with-keys S[,S] -- cmd [args]         run cmd with those keys (MCP servers)
 //	overclaud version
 package main
 
@@ -13,6 +15,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
 
 	"github.com/psumo/overclaud-installer/internal/app"
 	"github.com/psumo/overclaud-installer/internal/ui"
@@ -27,6 +30,21 @@ func run(args []string) int {
 	doubleClick := len(args) == 0
 	if len(args) > 0 && args[0] != "" && args[0][0] != '-' {
 		cmd, args = args[0], args[1:]
+	}
+	// These two take their own arguments, so they bypass the flag parser.
+	if cmd == "with-keys" {
+		return withKeys(args)
+	}
+	if cmd == "keys" {
+		a, err := app.New(ui.New(false))
+		if err == nil {
+			err = a.Keys(args)
+		}
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "overclaud keys:", err)
+			return 1
+		}
+		return 0
 	}
 	fs := flag.NewFlagSet(cmd, flag.ContinueOnError)
 	key := fs.String("key", "", "licence key (GC-XXXX-XXXX-XXXX)")
@@ -70,7 +88,7 @@ func run(args []string) int {
 	case "status":
 		err = a.Status()
 	default:
-		u.Fail("unknown command %q (install, update, doctor, status, version)", cmd)
+		u.Fail("unknown command %q (install, update, doctor, status, keys, with-keys, version)", cmd)
 		return 2
 	}
 	if err != nil {
@@ -78,4 +96,19 @@ func run(args []string) int {
 		return 1
 	}
 	return 0
+}
+
+// withKeys runs `overclaud with-keys S[,S] -- cmd args` and returns the child's exit code.
+// It prints nothing of its own on success: MCP servers speak over stdout.
+func withKeys(args []string) int {
+	if len(args) < 3 || args[1] != "--" {
+		fmt.Fprintln(os.Stderr, "usage: overclaud with-keys <service>[,<service>] -- <command> [args]")
+		return 2
+	}
+	a, err := app.New(ui.New(true))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "overclaud with-keys:", err)
+		return 1
+	}
+	return a.WithKeys(strings.Split(args[0], ","), args[2:])
 }
