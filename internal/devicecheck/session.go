@@ -44,7 +44,9 @@ func RunSession(ctx context.Context, claude string) SessionResult {
 		"Then reply with the single word DONE whatever happened."
 	c := exec.CommandContext(ctx, claude, "-p", prompt,
 		"--output-format", "stream-json", "--verbose", "--include-hook-events",
-		"--max-turns", "4", "--allowedTools", "Bash(echo:*)", "Bash(cat:*)")
+		// Only the exact harmless echo is approved. The canary read stays unapproved: in -p
+		// mode it is denied anyway, and PreToolUse hooks run before that decision.
+		"--max-turns", "4", "--allowedTools", "Bash(echo overclaud-device-check)")
 	c.Dir = prereq.NeutralDir()
 	c.Env = append(prereq.CleanEnv(), "OVERCLAUD_DEVICE_CHECK=1")
 	out, err := c.CombinedOutput()
