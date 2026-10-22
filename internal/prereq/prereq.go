@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // Tool is one prerequisite.
@@ -77,8 +78,8 @@ var Tools = []Tool{
 	// Debian/Ubuntu refuse `pip install` outside a virtual environment (PEP 668).
 	{Name: "PyYAML", Bins: pythonBins(), Args: []string{"-c", "import yaml; print(yaml.__version__)"},
 		Brew: "pyyaml", Apt: "python3-yaml", Dnf: "python3-pyyaml", Pacman: "python-yaml", Zypper: "python3-PyYAML",
-		Script: Script{Unix: "python3 -m pip install --user pyyaml",
-			Windows: "py -m pip install --user pyyaml"}},
+		Script: Script{Unix: "python3 -I -m pip install --user pyyaml",
+			Windows: "py -I -m pip install --user pyyaml"}},
 	{Name: "uv", Bins: []string{"uv"}, Args: []string{"--version"},
 		Winget: "astral-sh.uv", Brew: "uv",
 		Script: Script{Unix: "curl -LsSf https://astral.sh/uv/install.sh | sh",
@@ -129,6 +130,7 @@ func (OSRunner) LookPath(n string) (string, error) { return exec.LookPath(n) }
 func (OSRunner) Output(name string, args ...string) (string, error) {
 	c := exec.Command(name, args...)
 	c.Env = CleanEnv()
+	c.Dir = NeutralDir()
 	out, err := c.CombinedOutput()
 	return string(out), err
 }
@@ -136,8 +138,29 @@ func (OSRunner) Output(name string, args ...string) (string, error) {
 func (OSRunner) Interactive(name string, args ...string) error {
 	c := exec.Command(name, args...)
 	c.Env = CleanEnv()
+	c.Dir = NeutralDir()
 	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return c.Run()
+}
+
+var (
+	neutralOnce sync.Once
+	neutralDir  string
+)
+
+// NeutralDir is an empty private directory every child process starts in. The installer
+// is often launched from Downloads or a project folder; tools that read their working
+// directory (npx and a local .npmrc or node_modules, `python -c` putting it on sys.path)
+// must not pick up whatever is there.
+func NeutralDir() string {
+	neutralOnce.Do(func() {
+		if d, err := os.MkdirTemp("", "overclaud-run-"); err == nil {
+			neutralDir = d
+		} else if h, err := os.UserHomeDir(); err == nil {
+			neutralDir = h
+		}
+	})
+	return neutralDir
 }
 
 var versionRe = regexp.MustCompile(`(\d+)\.(\d+)(?:\.(\d+))?`)
